@@ -199,7 +199,7 @@ mining-project/
 
 ## Bonus Features
 
-Two of the three extra-credit features were implemented:
+Two of the three bonus features were implemented:
 
 ### Bonus 1 — Geospatial Visualization (Interactive Map)
 
