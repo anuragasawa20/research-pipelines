@@ -197,7 +197,7 @@ mining-project/
 
 ---
 
-## Bonus Points Implemented
+## Bonus Features
 
 Two of the three extra-credit features were implemented:
 
