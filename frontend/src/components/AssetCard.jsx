@@ -15,7 +15,7 @@ function AssetCard({ asset }) {
         <div className="chip-wrap">
           {asset.commodities?.length ? (
             asset.commodities.map((commodity) => (
-              <span key={`${asset.id}-${commodity}`} className="chip">
+              <span key={`${asset.id}-${commodity}`} className="chip chip-commodity">
                 {commodity}
               </span>
             ))

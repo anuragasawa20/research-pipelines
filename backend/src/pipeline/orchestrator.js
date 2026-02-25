@@ -9,6 +9,7 @@ const MAX_CONTENT_LEN = config.pipeline.maxCrawlContentLength;
 const MAX_CONTENT_PER_URL = config.pipeline.maxCrawlContentLengthPerUrl ?? 6000;
 const MIN_CONTENT_LEN = 100;
 const MAX_URLS_TO_CRAWL = config.pipeline.maxUrlsToCrawlPerTopic ?? 3;
+const COMPANY_CONCURRENCY = Math.max(1, config.pipeline.concurrentCompanies ?? 1);
 
 // Prefer URLs whose path contains these (for leadership). Crawl these first.
 const LEADERSHIP_URL_HINTS = ['board', 'management', 'executive', 'leadership', 'about'];
@@ -24,33 +25,53 @@ export async function runPipeline(runId, companyNames) {
   const crawl = getCrawlProvider();
   const llm = getLLMProvider();
 
-  let completedCount = 0;
-  let failedCount = 0;
-
-  for (const companyName of companyNames) {
+  const names = companyNames.map((name) => name.trim()).filter(Boolean);
+  const results = await runWithConcurrency(names, COMPANY_CONCURRENCY, async (companyName) => {
     try {
-      await processCompany(runId, companyName.trim(), search, crawl, llm);
-      completedCount++;
+      await processCompany(runId, companyName, search, crawl, llm);
+      return { ok: true, companyName };
     } catch (err) {
-      failedCount++;
       console.error(`[Pipeline] Company "${companyName}" failed:`, err.message);
-      await db.updateCompanyStatus(runId, companyName.trim(), 'failed', 'failed', err.message);
+      await db.updateCompanyStatus(runId, companyName, 'failed', 'failed', err.message);
+      return { ok: false, companyName };
     }
-  }
+  });
 
-  const finalStatus = failedCount === companyNames.length
-    ? 'failed'
-    : failedCount > 0
-      ? 'partial'
-      : 'completed';
+  const completedCount = results.filter((result) => result.ok).length;
+  const failedCount = results.length - completedCount;
+
+  let finalStatus = 'completed';
+  if (failedCount === names.length) {
+    finalStatus = 'failed';
+  } else if (failedCount > 0) {
+    finalStatus = 'partial';
+  }
 
   await db.updatePipelineRunStatus(
     runId,
     finalStatus,
-    failedCount > 0 ? `${failedCount}/${companyNames.length} companies failed` : null
+    failedCount > 0 ? `${failedCount}/${names.length} companies failed` : null
   );
 
   console.log(`[Pipeline] Run ${runId} finished: ${finalStatus} (${completedCount} ok, ${failedCount} failed)`);
+}
+
+async function runWithConcurrency(items, concurrency, worker) {
+  if (!items.length) return [];
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  async function runWorker() {
+    while (true) {
+      const current = cursor++;
+      if (current >= items.length) return;
+      results[current] = await worker(items[current], current);
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => runWorker()));
+  return results;
 }
 
 async function processCompany(runId, companyName, search, crawl, llm) {

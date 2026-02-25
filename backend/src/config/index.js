@@ -21,6 +21,9 @@ const config = {
     maxCrawlContentLengthPerUrl: 20000,
     searchResultsPerQuery: 5,
     maxUrlsToCrawlPerTopic: 3,
+    concurrentCompanies: parseInt(process.env.CONCURRENT_COMPANIES || '2', 10),
+    llmRequestsPerMinute: parseInt(process.env.LLM_REQUESTS_PER_MINUTE || '4', 10),
+    retryOn429: (process.env.LLM_RETRY_ON_429 || 'true').toLowerCase() !== 'false',
   },
 };
 

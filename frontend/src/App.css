@@ -75,20 +75,28 @@ a:hover {
   padding: 1rem;
 }
 
+.item-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
 .item-card h4 {
   margin: 0;
+  font-size: 1.25rem;
+  color: #1e293b;
 }
 
 .stack-xs > * + * {
-  margin-top: 0.35rem;
+  margin-top: 0.75rem;
 }
 
 .stack-sm > * + * {
-  margin-top: 0.65rem;
+  margin-top: 0.75rem;
 }
 
 .stack-md > * + * {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
 }
 
 .stack-lg > * + * {
@@ -123,7 +131,13 @@ button:disabled {
 }
 
 .muted {
+  color: #526277;
+}
+
+.position {
+  margin: 0;
   color: #64748b;
+  font-weight: 500;
 }
 
 .error {
@@ -203,14 +217,25 @@ td {
   background: #dbeafe;
   color: #1e3a8a;
   border-radius: 999px;
-  padding: 0.15rem 0.6rem;
-  font-size: 0.78rem;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.79rem;
+}
+
+.chip-expertise {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.chip-commodity {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .label {
   margin: 0;
-  font-weight: 600;
+  font-weight: 550;
   font-size: 0.85rem;
+  color: #475569;
 }
 
 .grid-2 {
@@ -227,4 +252,44 @@ td {
   max-height: 360px;
   overflow: auto;
   font-size: 0.82rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.section-head h3 {
+  margin: 0;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 0.45rem 0.75rem;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.button-link:hover {
+  text-decoration: none;
+  background: #1d4ed8;
+}
+
+.assets-map-wrap {
+  margin-top: 0.75rem;
+  border: 1px solid #d1d9e6;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.assets-map {
+  height: 420px;
+  width: 100%;
 }

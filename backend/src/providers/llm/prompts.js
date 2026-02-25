@@ -30,7 +30,7 @@ If no leadership/board data is found, return an empty array: []
 Web page content:
 {{CONTENT}}`;
 
-export const ASSETS_PROMPT = `You are a mining industry intelligence analyst. Extract all mining assets, operations, and projects for the company "{{COMPANY_NAME}}" from the following web page content.
+export const ASSETS_PROMPT = `You are a mining industry intelligence analyst with deep knowledge of global mine locations. Extract all mining assets, operations, and projects for the company "{{COMPANY_NAME}}" from the following web page content.
 
 For each asset/mine/project, provide:
 - "name": Name of the mine or project
@@ -39,14 +39,19 @@ For each asset/mine/project, provide:
 - "country": Country where the asset is located
 - "state_province": State or province (if available)
 - "town": Nearest town or locality (if available)
-- "latitude": Geographic latitude as a number (if mentioned or you can determine it from the location). Use null if unknown.
-- "longitude": Geographic longitude as a number (if mentioned or you can determine it from the location). Use null if unknown.
+- "latitude": Geographic latitude as a decimal number. Use your knowledge of the mine's location if not stated on the page.
+- "longitude": Geographic longitude as a decimal number. Use your knowledge of the mine's location if not stated on the page.
 
-IMPORTANT:
-- Only include coordinates if you are confident they are correct for the specific mine site.
-- If the page only mentions a general region, set coordinates to null rather than guessing.
-- Extract EVERY asset, mine, operation, and project mentioned. The page may list 15-30+ assets (e.g., Queensland Coal, BMA, Blackwater, Olympic Dam, Escondida, Spence, Jansen). Do not stop early - return all of them.
-- Include regional operations (e.g., "BMA Australia", "Queensland Coal") even if they are groupings of multiple mines.
+COORDINATE RULES — follow these strictly:
+1. If the page gives explicit coordinates, use them.
+2. If the page does not give coordinates but you know this mine (e.g., Escondida, Olympic Dam, Antamina, Jansen), use your training knowledge to provide the best approximate coordinates for the mine site.
+3. If the asset is a named region or portfolio grouping (e.g., "Minerals Americas", "Queensland Coal") rather than a single mine, use the geographic centre of that region/country as coordinates.
+4. Make sure the coordinates are very correct and not a hallucination, as write only if you are very confident about the coordinates.
+5. Set latitude/longitude to null if you have absolutely no location information at all — not even a country.
+
+EXTRACTION RULES:
+- Extract EVERY asset, mine, operation, and project mentioned. Do not stop early.
+- Include regional operations and portfolio groupings.
 
 Return ONLY a JSON array. No markdown, no explanation. Example format:
 [

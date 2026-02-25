@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import AssetCard from './AssetCard';
 import LeaderCard from './LeaderCard';
 
@@ -46,7 +47,12 @@ function CompanyProfile({ company }) {
       </section>
 
       <section className="stack-md">
-        <h3>Assets</h3>
+        <div className="section-head">
+          <h3>Assets</h3>
+          <Link className="button-link" to={`/companies/${company.id}/assets/map`}>
+            View on map
+          </Link>
+        </div>
         {assets.length ? (
           <div className="grid-2">
             {assets.map((asset) => (

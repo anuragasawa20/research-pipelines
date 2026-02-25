@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
 import Layout from './components/Layout';
+import AssetsMapPage from './pages/AssetsMapPage';
 import CompaniesPage from './pages/CompaniesPage';
 import CompanyDetailPage from './pages/CompanyDetailPage';
 import DebugPage from './pages/DebugPage';
@@ -16,6 +17,7 @@ function App() {
           <Route element={<RunDetailPage />} path="runs/:runId" />
           <Route element={<CompaniesPage />} path="companies" />
           <Route element={<CompanyDetailPage />} path="companies/:companyId" />
+          <Route element={<AssetsMapPage />} path="companies/:companyId/assets/map" />
           <Route element={<DebugPage />} path="debug" />
           <Route element={<Navigate replace to="/" />} path="*" />
         </Route>

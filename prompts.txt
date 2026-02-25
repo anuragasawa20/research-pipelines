@@ -1,0 +1,99 @@
+============================================================
+MINING INTELLIGENCE DATA PIPELINE — LLM PROMPTS
+============================================================
+
+These prompts are used by the Gemini 1.5 Flash LLM provider
+to extract structured data from crawled web page markdown.
+
+Model: Gemini 1.5 Flash (free tier)
+Temperature: 0.1 (low creativity, high accuracy)
+Output format: application/json (enforced via Gemini API)
+Max input: ~8000 characters of markdown per request
+
+============================================================
+PROMPT 1: LEADERSHIP EXTRACTION
+============================================================
+Purpose: Extract executives and board members with their
+expertise tags and 3-bullet technical summaries.
+
+---
+You are a mining industry intelligence analyst. Extract all executives and board members for the company "{{COMPANY_NAME}}" from the following web page content.
+
+For each person, provide:
+- "name": Full name
+- "title": Their role/title at the company (e.g., "CEO", "Non-Executive Director", "Chief Financial Officer")
+- "expertise_tags": An array of 1-4 expertise areas from this list: Geology, Metallurgy, Mining Engineering, Finance, Corporate Governance, Environmental, Legal, Marketing, Operations, Human Resources, Technology, Exploration, Project Development, Health & Safety. Only assign tags that are clearly supported by their bio.
+- "summary_bullets": Exactly 3 short bullet points (1 sentence each) focusing on their project experience, operational history, and technical accomplishments in mining/resources. If info is limited, summarize what is available.
+
+Return ONLY a JSON array. No markdown, no explanation. Example format:
+[
+  {
+    "name": "John Smith",
+    "title": "Chief Executive Officer",
+    "expertise_tags": ["Mining Engineering", "Operations", "Finance"],
+    "summary_bullets": [
+      "Led development of the Sunrise Gold Project from feasibility to production.",
+      "Over 25 years of operational experience across gold and copper mining in Australia.",
+      "Previously served as COO at Pacific Mining Ltd managing 3 operating sites."
+    ]
+  }
+]
+
+If no leadership/board data is found, return an empty array: []
+
+Web page content:
+{{CONTENT}}
+---
+
+============================================================
+PROMPT 2: ASSET/MINE EXTRACTION
+============================================================
+Purpose: Extract mining assets, operations, and projects with
+commodities, status, location, and geographic coordinates.
+
+---
+You are a mining industry intelligence analyst. Extract all mining assets, operations, and projects for the company "{{COMPANY_NAME}}" from the following web page content.
+
+For each asset/mine/project, provide:
+- "name": Name of the mine or project
+- "commodities": Array of commodities produced (e.g., ["gold"], ["copper", "gold"], ["lithium"])
+- "status": One of: "operating", "developing", "exploration", "closed", "care_and_maintenance", "unknown"
+- "country": Country where the asset is located
+- "state_province": State or province (if available)
+- "town": Nearest town or locality (if available)
+- "latitude": Geographic latitude as a number (if mentioned or you can determine it from the location). Use null if unknown.
+- "longitude": Geographic longitude as a number (if mentioned or you can determine it from the location). Use null if unknown.
+
+IMPORTANT:
+- Only include coordinates if you are confident they are correct for the specific mine site.
+- If the page only mentions a general region, set coordinates to null rather than guessing.
+- Include ALL assets mentioned, whether operating or in development.
+
+Return ONLY a JSON array. No markdown, no explanation. Example format:
+[
+  {
+    "name": "Pilgangoora Lithium-Tantalum Project",
+    "commodities": ["lithium", "tantalum"],
+    "status": "operating",
+    "country": "Australia",
+    "state_province": "Western Australia",
+    "town": "Port Hedland",
+    "latitude": -21.07,
+    "longitude": 118.82
+  }
+]
+
+If no assets are found, return an empty array: []
+
+Web page content:
+{{CONTENT}}
+---
+
+============================================================
+SEARCH QUERY TEMPLATES
+============================================================
+These are not LLM prompts, but the search queries used to
+find relevant pages for each company:
+
+Leadership search:  "{company_name} mining company leadership board executives management team"
+Assets search:      "{company_name} mining operations mines projects assets properties"

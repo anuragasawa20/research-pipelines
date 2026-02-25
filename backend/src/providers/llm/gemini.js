@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import config from '../../config/index.js';
 import { LEADERSHIP_PROMPT, ASSETS_PROMPT } from './prompts.js';
+import { getLLMLimiterConfig, scheduleLLM } from './rateLimiter.js';
 
 /**
  * Gemini LLM provider.
@@ -17,9 +18,11 @@ export default class GeminiProvider {
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
       },
     });
+    const limiter = getLLMLimiterConfig();
+    console.log(`[LLM] Gemini limiter configured at ${limiter.requestsPerMinute} RPM (${limiter.minTimeMs}ms spacing)`);
   }
 
   /**
@@ -35,7 +38,7 @@ export default class GeminiProvider {
       .replace('{{COMPANY_NAME}}', companyName)
       .replace('{{CONTENT}}', truncated);
 
-    const result = await this.model.generateContent(prompt);
+    const result = await this._generateWithRateLimitAndRetry(prompt, 'extractLeadership');
     const text = result.response.text();
     console.log('[LLM] extractLeadership raw response length:', text?.length);
     console.log('[LLM] extractLeadership raw response (first 500 chars):', text?.substring(0, 500));
@@ -58,7 +61,7 @@ export default class GeminiProvider {
       .replace('{{COMPANY_NAME}}', companyName)
       .replace('{{CONTENT}}', truncated);
 
-    const result = await this.model.generateContent(prompt);
+    const result = await this._generateWithRateLimitAndRetry(prompt, 'extractAssets');
     const text = result.response.text();
     console.log('[LLM] extractAssets raw response length:', text?.length);
     console.log('[LLM] extractAssets raw response (first 500 chars):', text?.substring(0, 500));
@@ -88,6 +91,7 @@ export default class GeminiProvider {
       if (parsed.assets && Array.isArray(parsed.assets)) return parsed.assets;
       return Array.isArray(parsed) ? parsed : [];
     } catch (parseErr) {
+      // Try greedy array regex first
       const match = text.match(/\[[\s\S]*?\]/);
       if (match) {
         try {
@@ -96,9 +100,102 @@ export default class GeminiProvider {
           return arr;
         } catch { /* fall through */ }
       }
+      // Response was likely truncated mid-array — salvage complete objects
+      const salvaged = this._salvageTruncatedArray(toParse);
+      if (salvaged) return salvaged;
+
       console.error('[LLM] _parseJSON failed:', parseErr.message);
       console.error('[LLM] _parseJSON input preview:', text.substring(0, 300));
       throw new Error(`Failed to parse LLM response: ${parseErr.message}. Preview: ${text.substring(0, 150)}`);
     }
   }
+
+  /**
+   * Walk the text character-by-character and return every complete top-level
+   * JSON object found inside an (possibly truncated) JSON array.
+   * This lets us recover partial results when the LLM hits its output token limit.
+   */
+  _salvageTruncatedArray(text) {
+    const objects = [];
+    let i = 0;
+    // Skip leading whitespace / opening bracket
+    while (i < text.length && (text[i] === '[' || text[i] === ' ' || text[i] === '\n' || text[i] === '\r')) i++;
+
+    while (i < text.length) {
+      if (text[i] !== '{') { i++; continue; }
+      // Track depth to find the matching closing brace
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      let start = i;
+      for (; i < text.length; i++) {
+        const ch = text[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\' && inString) { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') depth++;
+        if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            try {
+              objects.push(JSON.parse(text.slice(start, i + 1)));
+            } catch { /* skip malformed object */ }
+            i++;
+            break;
+          }
+        }
+      }
+    }
+
+    if (objects.length > 0) {
+      console.warn(`[LLM] _salvageTruncatedArray: recovered ${objects.length} objects from truncated response`);
+      return objects;
+    }
+    return null;
+  }
+
+  async _generateWithRateLimitAndRetry(prompt, opName) {
+    const maxAttempts = Math.max(1, (config.pipeline.maxRetries || 0) + 1);
+    let lastErr = null;
+    const queuedGenerate = () => this.model.generateContent(prompt);
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await scheduleLLM(queuedGenerate);
+      } catch (err) {
+        lastErr = err;
+        const shouldRetry429 = config.pipeline.retryOn429 && this._isRateLimitError(err);
+        if (!shouldRetry429 || attempt >= maxAttempts) {
+          throw err;
+        }
+        const delayMs = this._getRetryDelayMs(err, attempt);
+        console.warn(`[LLM] ${opName} hit rate limit. Retry ${attempt}/${maxAttempts - 1} in ${delayMs}ms`);
+        await sleep(delayMs);
+      }
+    }
+
+    throw lastErr;
+  }
+
+  _isRateLimitError(err) {
+    const status = err?.status || err?.response?.status || err?.cause?.status;
+    if (status === 429) return true;
+    const message = String(err?.message || '').toLowerCase();
+    return message.includes('429') || message.includes('resource_exhausted') || message.includes('rate limit');
+  }
+
+  _getRetryDelayMs(err, attempt) {
+    const retryAfterHeader = err?.response?.headers?.['retry-after'] || err?.response?.headers?.get?.('retry-after');
+    const retryAfter = Number(retryAfterHeader);
+    if (Number.isFinite(retryAfter) && retryAfter > 0) {
+      return retryAfter * 1000;
+    }
+    const base = 30000;
+    return Math.min(base * (2 ** (attempt - 1)), 180000);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
